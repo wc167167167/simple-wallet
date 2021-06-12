@@ -19,7 +19,7 @@ public class WalletController {
     private WalletService walletService;
 
     @GetMapping("/init")
-    public String init(@RequestParam int[] coins) {
+    public String init(@RequestParam(required = true) int[] coins) {
         try {
             walletService.init(coins);
 
@@ -38,7 +38,7 @@ public class WalletController {
     }
 
     @GetMapping("/pay")
-    public String pay(@RequestParam int amount) {
+    public String pay(@RequestParam(required = true) int amount) {
         try {
             var left = walletService.pay(amount);
             var leftCoins = IntStream.of(left).mapToObj(Integer::toString).collect(Collectors.joining(", "));

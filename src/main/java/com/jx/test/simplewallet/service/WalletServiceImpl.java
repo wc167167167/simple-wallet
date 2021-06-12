@@ -8,10 +8,12 @@ import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.management.InvalidAttributeValueException;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
+@AllArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
     @Autowired
@@ -19,8 +21,8 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public void init(int[] coins) throws InvalidAttributeValueException {
-        if (Arrays.stream(coins).anyMatch(c -> c <= 0)) {
-            throw new InvalidAttributeValueException("coins must be positiv values");
+        if (coins == null || coins.length == 0 || Arrays.stream(coins).anyMatch(c -> c <= 0)) {
+            throw new InvalidAttributeValueException("invalid coins");
         }
 
         var sortedStream = Arrays.stream(coins).sorted().boxed();
@@ -50,16 +52,22 @@ public class WalletServiceImpl implements WalletService {
     public int[] latest() {
         var latest = walletRecordDao.latest();
 
-        return Arrays.stream(latest.content().split(",")).map(Integer::parseInt).mapToInt(i -> i).toArray();
+        return latest == null
+            ? new int[0]
+            : Arrays.stream(latest.content().split(",")).map(Integer::parseInt).mapToInt(i -> i).toArray();
     }
 
     @Override
     public int[] pay(int amount) throws InvalidAttributeValueException, InvalidPaymentException {
-        if (amount < 0) {
+        if (amount <= 0) {
             throw new InvalidAttributeValueException("invalid amount");
         }
 
         var latest = walletRecordDao.latest();
+        if (latest == null) {
+            throw new InvalidPaymentException("wallet not initialised", new int[0]);
+        }
+
         var coins = Arrays
             .stream(latest.content().split(","))
             .map(Integer::parseInt)
@@ -70,11 +78,12 @@ public class WalletServiceImpl implements WalletService {
         }
 
         var coin = 0;
-        while (amount > 0) {
+        var amountToPay = amount;
+        while (amountToPay > 0) {
             coin = coins.removeFirst();
 
-            var diff = Math.min(amount, coin);
-            amount -= diff;
+            var diff = Math.min(amountToPay, coin);
+            amountToPay -= diff;
             coin -= diff;
         }
 
@@ -83,6 +92,7 @@ public class WalletServiceImpl implements WalletService {
         }
 
         var content = coins.stream().map(String::valueOf).collect(Collectors.joining(","));
+
         walletRecordDao.insert(
             WalletRecord
                 .builder()
